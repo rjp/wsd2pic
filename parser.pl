@@ -16,7 +16,31 @@ sub object {
     }
 }
 
+sub pobject {
+    my $name = shift;
+    if (not defined $object_names{$name}) {
+        push @objects, $name;
+        $object_names{$name} = 2;
+    }
+}
+
 while (<>) {
+    chomp;
+    s/^\s*//;
+    s/\s*$//;
+
+    if (/^participant\s+(.+)(?:\s+as (.+))/) {
+        if (defined $2) {
+            my ($k, $v) = ($2, $1);
+            pobject($k);
+            $v =~ s/\\n/"\\\n"/g;
+            push @output, ['p', qq/object($k,$v)/];
+        } else {
+            pobject($1);
+            push @output, ['p', qq/object($1,"$1")/];
+        }
+    }
+
     # simple message
     if (/^(.+?)(->|-->)(.+?): (.+)/) {
         object($1); object($3);
@@ -52,20 +76,22 @@ while (<>) {
     }
 }
 
-my $previous = undef;
+my $all = 0;
 foreach my $i (@objects) {
-    print qq/object($i,"$i");\n/;
+    if ($object_names{$i} == 1) { # not pre-defined
+        unshift @output, ['p', qq/object($i,"$i")/];
+    }
 }
-print "step();\n";
 
+my $previous = undef;
 foreach my $i (@output) {
-    my ($type, $outline) = @{$i};
-    print $outline, ";\n";
+    my ($type, $outline, @args) = @{$i};
     if ($type =~ /message$/) {
-        if ($previous =~ /message$/) {
+        if ($previous =~ /message$/ or $previous =~ /^p$/) {
             print "step();\n";
         }
     }
+    print $outline, ";\n";
     $previous = $type;
 }
 
